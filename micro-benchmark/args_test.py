@@ -8,6 +8,8 @@ class ArgsTest(TestBase):
 
     def test_assigned_call(self):
         self.validate_snippet(self.get_snippet_path("assigned_call"))
+        self.validate_snippet_meta(self.get_snippet_path("assigned_call"))
+    
 
     def test_call(self):
         self.validate_snippet(self.get_snippet_path("call"))

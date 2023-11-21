@@ -61,7 +61,7 @@ class ScopeManagerTest(TestBase):
             items = sm.handle_module("root", "", "")
 
         self.assertEqual(
-            sorted(items["functions"]),
+            sorted([d["fullns"] for d in items["functions"]]),
             sorted(
                 [
                     "root.chld1",
@@ -71,7 +71,9 @@ class ScopeManagerTest(TestBase):
                 ]
             ),
         )
-        self.assertEqual(sorted(items["classes"]), sorted(["root.chld3"]))
+        self.assertEqual(
+            sorted([c["fullns"] for c in items["classes"]]), sorted(["root.chld3"])
+        )
 
         self.assertEqual(sm.get_scope("root").get_ns(), "root")
         self.assertEqual(sm.get_scope("root").parent, None)

@@ -39,4 +39,5 @@ STATIC_METHOD = "staticmethod"
 INVALID_NAME = "<**INVALID**>"
 
 CALL_GRAPH_OP = "call-graph"
+META_ANALYSIS_OP = "meta-analysis"
 KEY_ERR_OP = "key-error"

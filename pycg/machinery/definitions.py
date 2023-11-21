@@ -26,7 +26,7 @@ class DefinitionManager(object):
     def __init__(self):
         self.defs = {}
 
-    def create(self, ns, def_type):
+    def create(self, ns, def_type, lineno=None, col_offset=None):
         if not ns or not isinstance(ns, str):
             raise DefinitionError("Invalid namespace argument")
         if def_type not in Definition.types:
@@ -34,7 +34,7 @@ class DefinitionManager(object):
         if self.get(ns):
             raise DefinitionError("Definition already exists")
 
-        self.defs[ns] = Definition(ns, def_type)
+        self.defs[ns] = Definition(ns, def_type, lineno, col_offset)
         return self.defs[ns]
 
     def assign(self, ns, defi):
@@ -58,25 +58,31 @@ class DefinitionManager(object):
     def get_defs(self):
         return self.defs
 
-    def handle_function_def(self, parent_ns, fn_name):
+    def handle_function_def(self, parent_ns, fn_name, lineno=None, col_offset=None):
         full_ns = utils.join_ns(parent_ns, fn_name)
         defi = self.get(full_ns)
         if not defi:
-            defi = self.create(full_ns, utils.constants.FUN_DEF)
+            defi = self.create(full_ns, utils.constants.FUN_DEF, lineno, col_offset)
             defi.decorator_names = set()
+        else:
+            defi.update_def(lineno, col_offset)
 
         return_ns = utils.join_ns(full_ns, utils.constants.RETURN_NAME)
-        if not self.get(return_ns):
-            self.create(return_ns, utils.constants.NAME_DEF)
-
+        return_ns_defi = self.get(return_ns)
+        if not return_ns_defi:
+            return_ns_defi = self.create(
+                return_ns, utils.constants.NAME_DEF, lineno, col_offset
+            )
+        return_ns_defi.update_def(lineno, col_offset)
         return defi
 
-    def handle_class_def(self, parent_ns, cls_name):
+    def handle_class_def(self, parent_ns, cls_name, lineno=None, col_offset=None):
         full_ns = utils.join_ns(parent_ns, cls_name)
         defi = self.get(full_ns)
         if not defi:
-            defi = self.create(full_ns, utils.constants.CLS_DEF)
-
+            defi = self.create(full_ns, utils.constants.CLS_DEF, lineno, col_offset)
+        else:
+            defi.update_def(lineno, col_offset)
         return defi
 
     def transitive_closure(self):
@@ -192,13 +198,41 @@ class Definition(object):
         utils.constants.EXT_DEF,
     ]
 
-    def __init__(self, fullns, def_type):
+    def __init__(self, fullns, def_type, lineno=None, col_offset=None):
         self.fullns = fullns
         self.points_to = {"lit": LiteralPointer(), "name": NamePointer()}
         self.def_type = def_type
+        if (
+            self.def_type != utils.constants.MOD_DEF
+            and self.def_type != utils.constants.EXT_DEF
+        ):
+            self.lineno = lineno
+            self.col_offset = col_offset
+            self.defined_at = {}
+            self.defined_at[lineno] = {
+                "col_offset": col_offset,
+                "points_to": {
+                    "lit": LiteralPointer(),
+                    "name": NamePointer(),
+                },
+            }
 
     def get_type(self):
         return self.def_type
+
+    def get_lineno(self):
+        # if (
+        #     self.def_type != utils.constants.MOD_DEF
+        #     and self.def_type != utils.constants.EXT_DEF
+        # ):
+        return list(self.defined_at.keys())
+
+    def get_col_offset(self):
+        # if (
+        #     self.def_type != utils.constants.MOD_DEF
+        #     and self.def_type != utils.constants.EXT_DEF
+        # ):
+        return self.col_offset
 
     def is_function_def(self):
         return self.def_type == utils.constants.FUN_DEF
@@ -209,11 +243,15 @@ class Definition(object):
     def is_callable(self):
         return self.is_function_def() or self.is_ext_def()
 
-    def get_lit_pointer(self):
-        return self.points_to["lit"]
+    def get_lit_pointer(self, lineno=None):
+        if lineno is None:
+            return self.points_to["lit"]
+        return self.defined_at[lineno]["points_to"]["lit"]
 
-    def get_name_pointer(self):
-        return self.points_to["name"]
+    def get_name_pointer(self, lineno=None):
+        if lineno is None:
+            return self.points_to["name"]
+        return self.defined_at[lineno]["points_to"]["name"]
 
     def get_name(self):
         return self.fullns.split(".")[-1]
@@ -224,6 +262,17 @@ class Definition(object):
     def merge(self, to_merge):
         for name, pointer in to_merge.points_to.items():
             self.points_to[name].merge(pointer)
+
+    def update_def(self, lineno=None, col_offset=None):
+        if self.def_type not in {utils.constants.MOD_DEF, utils.constants.EXT_DEF}:
+            if lineno not in self.defined_at:
+                self.defined_at[lineno] = {
+                    "col_offset": col_offset,
+                    "points_to": {
+                        "lit": LiteralPointer(),
+                        "name": NamePointer(),
+                    },
+                }
 
 
 class DefinitionError(Exception):

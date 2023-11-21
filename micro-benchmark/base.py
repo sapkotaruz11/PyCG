@@ -63,6 +63,12 @@ class TestBase(TestCase):
         expected = self.get_snippet_expected_cg(snippet_path)
 
         self.assertEqual(output, expected)
+        
+    def validate_snippet_meta(self, snippet_path):
+        output = self.get_snippet_output_meta_cg(snippet_path)
+        expected = self.get_snippet_expected_meta_cg(snippet_path)
+
+        self.assertEqual(output, expected)
 
     def get_snippet_path(self, name):
         return os.path.join(self.snippets_path, self.snippet_dir, name)
@@ -78,9 +84,27 @@ class TestBase(TestCase):
         except Exception as e:
             cg.tearDown()
             raise e
+        
+    def get_snippet_output_meta_cg(self, snippet_path):
+        main_path = os.path.join(snippet_path, "main.py")
+        try:
+            cg = self.cg_class(
+                [main_path], snippet_path, -1, utils.constants.META_CALL_GRAPH_OP
+            )
+            cg.analyze()
+            return cg.output()
+        except Exception as e:
+            cg.tearDown()
+            raise e
 
     def get_snippet_expected_cg(self, snippet_path):
         cg_path = os.path.join(snippet_path, "callgraph.json")
+        with open(cg_path, "r") as f:
+            return json.loads(f.read())
+        
+        
+    def get_snippet_expected_meta_cg(self, snippet_path):
+        cg_path = os.path.join(snippet_path, "metadata.json")
         with open(cg_path, "r") as f:
             return json.loads(f.read())
 

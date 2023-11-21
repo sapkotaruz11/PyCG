@@ -3,7 +3,7 @@ import json
 
 from pycg import formats
 from pycg.pycg import CallGraphGenerator
-from pycg.utils.constants import CALL_GRAPH_OP, KEY_ERR_OP
+from pycg.utils.constants import CALL_GRAPH_OP, KEY_ERR_OP, META_ANALYSIS_OP
 
 
 def main():
@@ -17,6 +17,9 @@ def main():
         help="Produce call graph using the FASTEN format",
         action="store_true",
         default=False,
+    )
+    parser.add_argument(
+        "--meta", help="Produce Call Graph with Meta Information", default=False
     )
     parser.add_argument("--product", help="Package name", default="")
     parser.add_argument(
@@ -38,13 +41,15 @@ def main():
     parser.add_argument(
         "--operation",
         type=str,
-        choices=[CALL_GRAPH_OP, KEY_ERR_OP],
+        choices=[CALL_GRAPH_OP, KEY_ERR_OP, META_ANALYSIS_OP],
         help=(
             "Operation to perform. Choose "
             + CALL_GRAPH_OP
             + " for call graph generation (default) or "
             + KEY_ERR_OP
             + " for key error detection on dictionaries."
+            + META_ANALYSIS_OP
+            + " for call graph generation with metadata."
         ),
         default=CALL_GRAPH_OP,
     )
@@ -66,9 +71,14 @@ def main():
             formatter = formats.Fasten(
                 cg, args.package, args.product, args.forge, args.version, args.timestamp
             )
+
         else:
             formatter = formats.Simple(cg)
         output = formatter.generate()
+
+    elif args.operation == META_ANALYSIS_OP:
+        formatter = formats.Meta(cg)
+
     else:
         output = cg.output_key_errs()
 

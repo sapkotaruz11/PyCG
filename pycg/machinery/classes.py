@@ -26,9 +26,9 @@ class ClassManager:
         if name in self.names:
             return self.names[name]
 
-    def create(self, name, module):
+    def create(self, name, module, lineno=None):
         if name not in self.names:
-            cls = ClassNode(name, module)
+            cls = ClassNode(name, module, lineno)
             self.names[name] = cls
         return self.names[name]
 
@@ -37,10 +37,11 @@ class ClassManager:
 
 
 class ClassNode:
-    def __init__(self, ns, module):
+    def __init__(self, ns, module, lineno):
         self.ns = ns
         self.module = module
         self.mro = [ns]
+        self.lineno = lineno
 
     def add_parent(self, parent):
         if isinstance(parent, str):

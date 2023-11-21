@@ -82,11 +82,13 @@ class PreProcessor(ProcessingBase):
     def visit_Module(self, node):
         def iterate_mod_items(items, const):
             for item in items:
-                defi = self.def_manager.get(item)
+                defi = self.def_manager.get(item["fullns"])
                 if not defi:
-                    defi = self.def_manager.create(item, const)
-
-                splitted = item.split(".")
+                    defi = self.def_manager.create(
+                        item["fullns"], const, item["lineno"]
+                    )
+                defi.update_def(item["lineno"])
+                splitted = item["fullns"].split(".")
                 name = splitted[-1]
                 parentns = ".".join(splitted[:-1])
                 self.scope_manager.get_scope(parentns).add_def(name, defi)
@@ -176,7 +178,7 @@ class PreProcessor(ProcessingBase):
                         defi.get_ns()
                     )
 
-        def add_external_def(name, target):
+        def add_external_def(name, target, lineno, col_offset):
             # In case we encounter an external import in the form of:
             #  "import package.module.module...
             # we want to treat it as: "import package"
@@ -189,14 +191,20 @@ class PreProcessor(ProcessingBase):
             # add an external def for the name
             defi = self.def_manager.get(name)
             if not defi:
-                defi = self.def_manager.create(name, utils.constants.EXT_DEF)
+                defi = self.def_manager.create(
+                    name, utils.constants.EXT_DEF, lineno, col_offset
+                )
+            defi.update_def(lineno, col_offset)
             scope = self.scope_manager.get_scope(self.current_ns)
             if target != "*":
                 # add a def for the target that points to the name
                 tgt_ns = utils.join_ns(scope.get_ns(), target)
                 tgt_defi = self.def_manager.get(tgt_ns)
                 if not tgt_defi:
-                    tgt_defi = self.def_manager.create(tgt_ns, utils.constants.EXT_DEF)
+                    tgt_defi = self.def_manager.create(
+                        tgt_ns, utils.constants.EXT_DEF, lineno, col_offset
+                    )
+                tgt_defi.update_def(lineno, col_offset)
                 tgt_defi.get_name_pointer().add(defi.get_ns())
                 scope.add_def(target, tgt_defi)
 
@@ -206,7 +214,7 @@ class PreProcessor(ProcessingBase):
             imported_name = self.import_manager.handle_import(src_name, level)
 
             if not imported_name:
-                add_external_def(src_name, tgt_name)
+                add_external_def(src_name, tgt_name, node.lineno, node.col_offset)
                 continue
 
             fname = self.import_manager.get_filepath(imported_name)
@@ -257,12 +265,14 @@ class PreProcessor(ProcessingBase):
 
         defaults = self._get_fun_defaults(node)
 
-        fn_def = self.def_manager.handle_function_def(self.current_ns, fn_name)
+        fn_def = self.def_manager.handle_function_def(
+            self.current_ns, fn_name, node.lineno, node.col_offset
+        )
 
         mod = self.module_manager.get(self.modname)
         if not mod:
             mod = self.module_manager.create(self.modname, self.filename)
-        mod.add_method(fn_def.get_ns(), node.lineno, self._get_last_line(node))
+        mod.add_method(fn_def.get_ns(), self._get_last_line(node))
 
         defs_to_create = []
         name_pointer = fn_def.get_name_pointer()
@@ -286,13 +296,18 @@ class PreProcessor(ProcessingBase):
             arg_ns = utils.join_ns(fn_def.get_ns(), node.args.args[0].arg)
             arg_def = self.def_manager.get(arg_ns)
             if not arg_def:
-                arg_def = self.def_manager.create(arg_ns, utils.constants.NAME_DEF)
-            arg_def.get_name_pointer().add(current_def.get_ns())
+                arg_def = self.def_manager.create(
+                    arg_ns, utils.constants.NAME_DEF, node.lineno, node.col_offset
+                )
+            arg_def.update_def(node.lineno, node.col_offset)
+            arg_def.get_name_pointer(node.lineno).add(current_def.get_ns())
 
             self.scope_manager.handle_assign(
                 fn_def.get_ns(), arg_def.get_name(), arg_def
             )
-            node.args.args = node.args.args[1:]
+            node.args.args = (
+                node.args.args[1:] if node.args.args[0] == "self" else node.args.args
+            )
 
         for pos, arg in enumerate(node.args.args):
             arg_ns = utils.join_ns(fn_def.get_ns(), arg.arg)
@@ -314,7 +329,10 @@ class PreProcessor(ProcessingBase):
         for arg_ns in defs_to_create:
             arg_def = self.def_manager.get(arg_ns)
             if not arg_def:
-                arg_def = self.def_manager.create(arg_ns, utils.constants.NAME_DEF)
+                arg_def = self.def_manager.create(
+                    arg_ns, utils.constants.NAME_DEF, node.lineno, node.col_offset
+                )
+            arg_def.update_def(node.lineno, node.col_offset)
 
             self.scope_manager.handle_assign(
                 fn_def.get_ns(), arg_def.get_name(), arg_def
@@ -347,10 +365,13 @@ class PreProcessor(ProcessingBase):
         if isinstance(node.target, ast.Name):
             target_ns = utils.join_ns(self.current_ns, node.target.id)
             if not self.def_manager.get(target_ns):
-                defi = self.def_manager.create(target_ns, utils.constants.NAME_DEF)
+                defi = self.def_manager.create(
+                    target_ns, utils.constants.NAME_DEF, node.lineno, node.col_offset
+                )
                 self.scope_manager.get_scope(self.current_ns).add_def(
                     node.target.id, defi
                 )
+            defi.update_def(node.lineno, node.col_offset)
         super().visit_For(node)
 
     def visit_Assign(self, node):
@@ -371,7 +392,6 @@ class PreProcessor(ProcessingBase):
             return
 
         utils.join_ns(self.current_ns, node.func.id)
-
         defi = self.scope_manager.get_def(self.current_ns, node.func.id)
         if not defi:
             return
@@ -402,17 +422,20 @@ class PreProcessor(ProcessingBase):
 
     def visit_ClassDef(self, node):
         # create a definition for the class (node.name)
-        cls_def = self.def_manager.handle_class_def(self.current_ns, node.name)
-
+        cls_def = self.def_manager.handle_class_def(
+            self.current_ns, node.name, node.lineno, node.col_offset
+        )
         mod = self.module_manager.get(self.modname)
         if not mod:
             mod = self.module_manager.create(self.modname, self.filename)
-        mod.add_method(cls_def.get_ns(), node.lineno, self._get_last_line(node))
+        mod.add_method(cls_def.get_ns(), self._get_last_line(node))
 
         # iterate bases to compute MRO for the class
         cls = self.class_manager.get(cls_def.get_ns())
         if not cls:
-            cls = self.class_manager.create(cls_def.get_ns(), self.modname)
+            cls = self.class_manager.create(
+                cls_def.get_ns(), self.modname, cls_def.get_lineno()
+            )
 
         super().visit_ClassDef(node)
 

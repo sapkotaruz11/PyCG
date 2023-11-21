@@ -1,0 +1,114 @@
+{
+    "main": {
+        "name_pointers": [],
+        "lit_pointers": []
+    },
+    "main.MyClass.func": {
+        "defined_at": {
+            "2": {
+                "name": [],
+                "lit": []
+            }
+        }
+    },
+    "main.MyClass.func2": {
+        "defined_at": {
+            "11": {
+                "name": [],
+                "lit": []
+            }
+        }
+    },
+    "main.MyClass": {
+        "defined_at": {
+            "1": {
+                "name": [],
+                "lit": []
+            },
+            "10": {
+                "name": [],
+                "lit": []
+            }
+        }
+    },
+    "main.MyClass.func.<RETURN>": {
+        "defined_at": {
+            "2": {
+                "name": [],
+                "lit": []
+            }
+        }
+    },
+    "main.MyClass.func.self": {
+        "defined_at": {
+            "2": {
+                "name": [
+                    "main.MyClass"
+                ],
+                "lit": []
+            }
+        }
+    },
+    "main.a": {
+        "defined_at": {
+            "6": {
+                "name": [
+                    [
+                        "main.MyClass",
+                        1
+                    ]
+                ],
+                "lit": []
+            },
+            "15": {
+                "name": [
+                    [
+                        "main.MyClass",
+                        10
+                    ]
+                ],
+                "lit": []
+            }
+        }
+    },
+    "main.b": {
+        "defined_at": {
+            "7": {
+                "name": [
+                    [
+                        "main.MyClass.func",
+                        null
+                    ]
+                ],
+                "lit": []
+            },
+            "16": {
+                "name": [
+                    [
+                        "main.MyClass.func2",
+                        null
+                    ]
+                ],
+                "lit": []
+            }
+        }
+    },
+    "main.MyClass.func2.<RETURN>": {
+        "defined_at": {
+            "11": {
+                "name": [],
+                "lit": []
+            }
+        }
+    },
+    "main.MyClass.func2.self": {
+        "defined_at": {
+            "11": {
+                "name": [
+                    "main.MyClass"
+                ],
+                "lit": []
+            }
+        }
+    }
+}

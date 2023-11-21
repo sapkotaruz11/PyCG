@@ -26,8 +26,10 @@ from pycg.machinery.classes import ClassManager
 from pycg.machinery.definitions import DefinitionManager
 from pycg.machinery.imports import ImportManager
 from pycg.machinery.key_err import KeyErrors
+from pycg.machinery.meta_ag import MetaAssignmentGraph
 from pycg.machinery.modules import ModuleManager
 from pycg.machinery.scopes import ScopeManager
+from pycg.processing.agprocessor import MetaAgProcessor
 from pycg.processing.cgprocessor import CallGraphProcessor
 from pycg.processing.keyerrprocessor import KeyErrProcessor
 from pycg.processing.postprocessor import PostProcessor
@@ -49,6 +51,7 @@ class CallGraphGenerator(object):
         self.def_manager = DefinitionManager()
         self.class_manager = ClassManager()
         self.module_manager = ModuleManager()
+        self.meta_cg = MetaAssignmentGraph()
         self.cg = CallGraph()
         self.key_errs = KeyErrors()
 
@@ -56,10 +59,43 @@ class CallGraphGenerator(object):
         state = {}
         state["defs"] = {}
         for key, defi in self.def_manager.get_defs().items():
-            state["defs"][key] = {
-                "names": defi.get_name_pointer().get().copy(),
-                "lit": defi.get_lit_pointer().get().copy(),
-            }
+            if (
+                defi.def_type != utils.constants.MOD_DEF
+                and defi.def_type != utils.constants.EXT_DEF
+            ):
+                state["defs"][key] = {
+                    "names": defi.get_name_pointer().get().copy(),
+                    "lit": defi.get_lit_pointer().get().copy(),
+                    "lineno": defi.get_lineno(),
+                }
+            else:
+                state["defs"][key] = {
+                    "names": defi.get_name_pointer().get().copy(),
+                    "lit": defi.get_lit_pointer().get().copy(),
+                }
+        state["defs_fs"] = {}
+        for key, defi in self.def_manager.get_defs().items():
+            state["defs_fs"][key] = {}  # Initialize the inner dictionary for each key
+            if (
+                defi.def_type != utils.constants.MOD_DEF
+                and defi.def_type != utils.constants.EXT_DEF
+            ):
+                for item, value in defi.defined_at.items():
+                    state["defs_fs"][key].update(
+                        {
+                            item: {
+                                "names": value["points_to"]["name"].get(),
+                                "lit": value["points_to"]["lit"].get(),
+                            }
+                        }
+                    )
+            else:
+                state["defs_fs"][key].update(
+                    {
+                        "names": defi.get_name_pointer().get().copy(),
+                        "lit": defi.get_lit_pointer().get().copy(),
+                    }
+                )
 
         state["scopes"] = {}
         for key, scope in self.scope_manager.get_scopes().items():
@@ -69,7 +105,7 @@ class CallGraphGenerator(object):
 
         state["classes"] = {}
         for key, ch in self.class_manager.get_classes().items():
-            state["classes"][key] = ch.get_mro().copy()
+            state["classes"][key] = {"MRO": ch.get_mro().copy(), "lineno": ch.lineno}
         return state
 
     def reset_counters(self):
@@ -201,6 +237,17 @@ class CallGraphGenerator(object):
                 self.module_manager,
                 call_graph=self.cg,
             )
+        elif self.operation == utils.constants.META_ANALYSIS_OP:
+            self.do_pass(
+                MetaAgProcessor,
+                False,
+                self.import_manager,
+                self.scope_manager,
+                self.def_manager,
+                self.class_manager,
+                self.module_manager,
+                call_graph=self.meta_cg,
+            )
         elif self.operation == utils.constants.KEY_ERR_OP:
             self.do_pass(
                 KeyErrProcessor,
@@ -215,7 +262,10 @@ class CallGraphGenerator(object):
             raise Exception("Invalid operation: " + self.operation)
 
     def output(self):
-        return self.cg.get()
+        if self.operation == utils.constants.META_ANALYSIS_OP:
+            return self.meta_cg.get()
+        else:
+            return self.cg.get()
 
     def output_key_errs(self):
         return self.key_errs.get()
@@ -225,7 +275,10 @@ class CallGraphGenerator(object):
     #     return self.key_errors
 
     def output_edges(self):
-        return self.cg.get_edges()
+        if self.operation == utils.constants.META_ANALYSIS_OP:
+            return self.meta_cg.get_edges()
+        else:
+            return self.cg.get_edges()
 
     def _generate_mods(self, mods):
         res = {}

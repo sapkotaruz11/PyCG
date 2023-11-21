@@ -222,7 +222,10 @@ class PostProcessor(ProcessingBase):
         # create a list definition
         list_def = self.def_manager.get(list_full_ns)
         if not list_def:
-            list_def = self.def_manager.create(list_full_ns, utils.constants.NAME_DEF)
+            list_def = self.def_manager.create(
+                list_full_ns, utils.constants.NAME_DEF, node.lineno, node.col_offset
+            )
+        list_def.update_def(node.lineno, node.col_offset)
         current_scope.add_def(list_name, list_def)
 
         self.name_stack.append(list_name)
@@ -231,7 +234,10 @@ class PostProcessor(ProcessingBase):
             key_full_ns = utils.join_ns(list_def.get_ns(), utils.get_int_name(idx))
             key_def = self.def_manager.get(key_full_ns)
             if not key_def:
-                key_def = self.def_manager.create(key_full_ns, utils.constants.NAME_DEF)
+                key_def = self.def_manager.create(
+                    key_full_ns, utils.constants.NAME_DEF, node.lineno, node.col_offset
+                )
+            key_def.update_def(node.lineno, node.col_offset)
 
             decoded_elt = self.decode_node(elt)
             for v in decoded_elt:
@@ -257,7 +263,10 @@ class PostProcessor(ProcessingBase):
         # Create a dict definition
         dict_def = self.def_manager.get(dict_full_ns)
         if not dict_def:
-            dict_def = self.def_manager.create(dict_full_ns, utils.constants.NAME_DEF)
+            dict_def = self.def_manager.create(
+                dict_full_ns, utils.constants.NAME_DEF, node.lineno, node.col_offset
+            )
+        dict_def.update_def(node.lineno, node.col_offset)
         # add it to the current scope
         current_scope.add_def(dict_name, dict_def)
 
@@ -289,8 +298,12 @@ class PostProcessor(ProcessingBase):
                     key_def = self.def_manager.get(key_full_ns)
                     if not key_def:
                         key_def = self.def_manager.create(
-                            key_full_ns, utils.constants.NAME_DEF
+                            key_full_ns,
+                            utils.constants.NAME_DEF,
+                            node.lineno,
+                            node.col_offset,
                         )
+                    key_def.update_def(node.lineno, node.col_offset)
                     dict_scope.add_def(str(name), key_def)
                     for v in decoded_value:
                         if isinstance(v, Definition):
@@ -321,7 +334,13 @@ class PostProcessor(ProcessingBase):
                 new_ns = utils.join_ns(parent_def.get_ns(), key)
                 new_def = self.def_manager.get(new_ns)
                 if not new_def:
-                    new_def = self.def_manager.create(new_ns, utils.constants.NAME_DEF)
+                    new_def = self.def_manager.create(
+                        new_ns,
+                        utils.constants.NAME_DEF,
+                        child_def.lineno,
+                        child_def.col_offset,
+                    )
+                new_def.update_def(child_def.lineno, child_def.col_offset)
 
                 new_def.get_name_pointer().add_set(names)
                 new_def.get_name_pointer().add(child_def.get_ns())
